@@ -1,0 +1,32 @@
+- Show primitive types other than int's.
+
+- Track and show structs, unions (and pointers into them).
+
+- Show pointer-to-things-other-than-int and
+  arrays-of-things-other-than-int.
+
+- Trace dynamic allocations.
+
+  E.g.:  Have a global data structure that tracks dynamically
+  allocated memory by hooking into functions like
+  cstdlib/stdlib.c:StdlibMalloc().  In the trace_state_print() output
+  JSON, in addition to the globals and the stack, walk the
+  dynamically-allocated-memory data structure and output the details.
+  Also, for each pointer, in the JSON, output the pointed-to type and
+  its size (in addition to the fact that the pointer is a pointer).
+  In the python driver, for each malloc()-ed block, maintain its type
+  based on the pointed-to type of some pointer pointing to the block.
+  With this info, each malloc()-ed block can be displayed as part of
+  the state, and when a malloc()-ed block is modified through a
+  pointer, the change marker can be shown.
+
+- When some variable is modified through one or more levels of
+  indirection, show the details of the indirection (needs tracing the
+  assignment itself as opposed to the current diff-based change
+  tracking).
+
+- Track logical sequence points in addition to (or instead of)
+  semicolons, to allow finer-grained tracing (e.g., currently the
+  condition evaluation of an if or a while is not traced).
+
+----------------------------------------------------------------------

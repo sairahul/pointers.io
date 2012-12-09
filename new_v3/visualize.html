@@ -1,0 +1,76 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>Online C Tutor - Visualize program execution</title>
+
+<!-- requirements for pytutor.js -->
+  <script type="text/javascript" src="js/d3.v2.min.js"></script>
+  <script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+  <script type="text/javascript" src="js/jquery.ba-bbq.min.js"></script> <!-- for handling back button and URL hashes -->
+  <script type="text/javascript" src="js/jquery.jsPlumb-1.3.10-all-min.js "></script> <!-- for rendering SVG connectors
+                                                                                         DO NOT UPGRADE ABOVE 1.3.10 OR ELSE BREAKAGE WILL OCCUR -->
+  <script type="text/javascript" src="js/jquery-ui-1.8.24.custom.min.js"></script> <!-- for sliders and other UI elements -->
+  <link type="text/css" href="css/ui-lightness/jquery-ui-1.8.24.custom.css" rel="stylesheet" />
+
+  <!-- for annotation bubbles -->
+  <script type="text/javascript" src="js/jquery.qtip.min.js"></script>
+  <link type="text/css" href="css/jquery.qtip.css" rel="stylesheet" />
+  <script type="text/javascript" src="js/pytutor.js"></script>
+  <link rel="stylesheet" href="css/pytutor.css"/>
+
+  <link href="css/bootstrap.css" rel="stylesheet">
+  <link href="css/bootstrap-responsive.css" rel="stylesheet">
+
+  <!-- requirements for opt-frontend.js -->
+
+  <!-- codemirror.net online code editor -->
+  <script type="text/javascript" src="js/codemirror/codemirror.js"></script>
+  <link type="text/css" href="css/codemirror.css" rel="stylesheet" />
+  <script type="text/javascript" src="js/codemirror/clike.js"></script>
+
+  <script type="text/javascript" src="js/opt-frontend.js"></script>
+  <link rel="stylesheet" href="css/opt-frontend.css"/>
+
+</head>
+
+<body>
+
+<div class="container">
+  <div id="pyInputPane">
+    Write your C code here:
+    <br/>
+
+    <!-- populate with a CodeMirror instance -->
+    <div id="codeInputPane"></div>
+
+    <!-- TODO: Remove following references in javascript and cleanup following code-->
+
+    <p style="margin-top: 10px; display:none;">
+        Execute code using
+      <select id="pythonVersionSelector">
+        <option value="2">Python 2.7</option>
+        <option value="3">Python 3.2</option>
+      </select>
+        and
+      <select id="cumulativeModeSelector">
+        <option value="false">don't display exited functions (default).</option>
+        <option value="true">display frames of exited functions.</option>
+      </select>
+    </p>
+
+    <p style="text-align: center; margin-top: 20px;">
+      <button id="executeBtn" class="bigBtn" type="button">Visualize execution</button>
+    </p>
+
+    <!-- TODO: Remove following references in javascript and cleanup following code-->
+    <a style="display:none;" id="aliasExampleLink" href="#">hello</a>
+  </div>
+
+  <div id="pyOutputPane"></div>
+
+</div>
+
+</body>
+</html>
+
