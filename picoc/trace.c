@@ -2,187 +2,42 @@
 
 #include <jansson.h>
 
+#include "interpreter.h"
 #include "trace.h"
 
-
-static char *Base_type_str[] = {
-    "Void",
-    "Int",
-    "Short",
-    "Char",
-    "Long",
-    "UnsignedInt",
-    "UnsignedShort",
-    "UnsignedLong",
-    #ifndef NO_FP
-        "FP",
-    #endif
-    "Function",
-    "Macro",
-    "Pointer",
-    "Array",
-    "Struct",
-    "Union",
-    "Enum",
-    "GotoLabel",
-    "_Type",
-};
-
-
-enum {
-    ITER_RETURN_YIELD,
-    ITER_RETURN_EXIT,
-};
-
-
-typedef struct Iter {
-    int state;
-} Iter;
-
-
-enum {
-    ITER_STATE_BEGIN = -1,
-    ITER_STATE_NEXT = -2,
-};
-
-
-#define ITER_OPEN(_s) do { \
-    (_s).state = ITER_STATE_BEGIN; \
-} while (0)
-
-
-#define ITER_CLOSE(_s) do { \
-} while (0)
-
-
-#define ITER_BEGIN(_s) \
-    switch ((_s).state) { \
-    case ITER_STATE_BEGIN: \
-        ;
-
-
-#define ITER_END(_s) \
-    } /* switch */ \
-    return ITER_RETURN_EXIT;
-
-
-#define ITER_YIELD(_s, _next) do { \
-    (_s).state = (_next); \
-    return ITER_RETURN_YIELD; \
-    case (_next): \
-       ; \
-} while (0)
-
-
-#define ITER_YIELD_NEXT(_s) ITER_YIELD((_s), ITER_STATE_NEXT)
-
-
-typedef struct TableIter {
-    Iter iter;
-    const struct Table *table;
-    int i;
-    const struct TableEntry *entry;
-} TableIter;
-
-
-static void table_iter_open (TableIter *s, const struct Table *table)
-
-{
-
-    s->table = table;
-    ITER_OPEN(s->iter);
-
-} /* table_iter_open() */
-
-
-static void table_iter_close (TableIter *s)
-
-{
-
-    ITER_CLOSE(s->iter);
-
-} /* table_iter_close() */
-
-
-static int table_iter_next (TableIter *s,
-                            const struct TableEntry **te)
-
-{
-
-    ITER_BEGIN(s->iter);
-
-    for (s->i = 0; s->i < s->table->Size; s->i ++) {
-        for (s->entry = s->table->HashTable[s->i];
-             s->entry != NULL;
-             s->entry = s->entry->Next) {
-            if (! s->entry->p.v.Val->IsLValue)
-                continue;
-            *te = s->entry;
-            ITER_YIELD_NEXT(s->iter);
-        }
-    }
-
-    ITER_END(s->iter);
-
-} /* table_iter_next() */
-
-
-typedef struct TraceVariablesIter {
-    Iter iter;
-    TableIter table_iter;
-    const struct StackFrame *sf;
-} TraceVariablesIter;
-
+typedef enum {
+    ARRAY_OBJECT,
+    STRUCT_OBJECT
+} ObjectType;
 
 typedef struct TraceVariable {
     const char *func_name;
     const char *var_name;
+    const char *identifier;
+    const char *base_address;
     unsigned long address;
     int is_array;
     long array_len;
     enum BaseType type;
     union {
-        int i;
+        char c;
+        long i;
         double d;
+        struct Table *tbl;
+
         const int *array_i;
         void *ptr;
         void **array_ptr;
     } v;
 } TraceVariable;
 
-
-enum {
-    STATE_NEXT_STACK,
-    STATE_NEXT_GLOBAL,
-};
-
-
-static int trace_variables_iter_open (TraceVariablesIter *s)
-
-{
-
-    ITER_OPEN(s->iter);
-
-    return 0;
-
-} /* trace_variables_iter_open() */
-
-
-static void trace_variables_iter_close (TraceVariablesIter *s)
-
-{
-
-    ITER_CLOSE(s->iter);
-
-} /* trace_variables_iter_close() */
-
-
 static void trace_variable_fill (TraceVariable *var,
-                                 const struct TableEntry *entry)
-
+                                 const struct TableEntry *entry,
+                                 char *base_addr)
 {
 
     /* var->func_name = NULL; */
+    union AnyValue *any_value;
     var->var_name = entry->p.v.Key;
     var->address = (unsigned long)entry->p.v.Val->Val;
     var->is_array = entry->p.v.Val->Typ->Base == TypeArray;
@@ -206,190 +61,55 @@ static void trace_variable_fill (TraceVariable *var,
     } else {
         switch (var->type) {
             case TypeInt:
-                var->v.i = entry->p.v.Val->Val->Integer;
-            break;
+                if (base_addr != NULL){
+                    any_value = (union AnyValue *)(base_addr + entry->p.v.Val->Val->Integer);
+                    var->v.i = any_value->Integer;
+                }else{
+                    var->v.i = entry->p.v.Val->Val->Integer;
+                }
+                break;
             case TypePointer:
                 var->v.ptr = entry->p.v.Val->Val->Pointer;
-            break;
+                break;
+            case TypeChar:
+                if (base_addr != NULL){
+                    any_value = (union AnyValue *)(base_addr + entry->p.v.Val->Val->Integer);
+                    var->v.i = any_value->Character;
+                }else{
+                    var->v.c = entry->p.v.Val->Val->Character;
+                }
+                break;
+            case TypeShort:
+                var->v.i = entry->p.v.Val->Val->ShortInteger;
+                break;
+            case TypeLong:
+                var->v.i = entry->p.v.Val->Val->LongInteger;
+                break;
+            case TypeUnsignedInt:
+                var->v.i = entry->p.v.Val->Val->UnsignedInteger;
+                break;
+            case TypeUnsignedShort:
+                var->v.i = entry->p.v.Val->Val->UnsignedShortInteger;
+                break;
+            case TypeUnsignedLong:
+                var->v.i = entry->p.v.Val->Val->UnsignedLongInteger;
+                break;
             case TypeFP:
                 var->v.d = entry->p.v.Val->Val->FP;
+                break;
+            case TypeUnion:
+            case TypeStruct:
+                var->base_address = (char *)entry->p.v.Val->Val;
+                var->v.tbl = entry->p.v.Val->Typ->Members;
+                var->identifier = entry->p.v.Val->Typ->Identifier;
+                break;
             default:
-            break;
+                break;
         }
     }
 
 } /* trace_variable_fill() */
 
-
-static int trace_variables_iter_next (TraceVariablesIter *s,
-                                      TraceVariable *var)
-
-{
-
-    int v;
-    const struct TableEntry *entry;
-
-    ITER_BEGIN(s->iter);
-
-    for (s->sf = TopStackFrame;
-         s->sf != NULL;
-         s->sf = s->sf->PreviousStackFrame) {
-         table_iter_open(&s->table_iter, &s->sf->LocalTable);
-         while (1) {
-             v = table_iter_next(&s->table_iter, &entry);
-             if (v != 0)
-                 break;
-            trace_variable_fill(var, entry);
-            var->func_name = s->sf->FuncName;
-            ITER_YIELD(s->iter, STATE_NEXT_STACK);
-         }
-         table_iter_close(&s->table_iter);
-    }
-
-    table_iter_open(&s->table_iter, &GlobalTable);
-    while (1) {
-        v = table_iter_next(&s->table_iter, &entry);
-        if (v != 0)
-            break;
-        trace_variable_fill(var, entry);
-        var->func_name = NULL;
-        ITER_YIELD(s->iter, STATE_NEXT_GLOBAL);
-    }
-    table_iter_close(&s->table_iter);
-
-    ITER_END(s->iter);
-
-} /* trace_variables_iter_next() */
-
-
-static void print_kv_s (const char *key, const char *value)
-
-{
-
-    fprintf(stderr, "\"%s\":\"%s\",", key, value);
-
-} /* print_kv_s() */
-
-
-static void print_kv_ld (const char *key, long value)
-
-{
-
-    fprintf(stderr, "\"%s\":%ld,", key, value);
-
-} /* print_kv_ld() */
-
-
-static void print_kv_lu (const char *key, unsigned long value)
-
-{
-
-    fprintf(stderr, "\"%s\":%lu,", key, value);
-
-} /* print_kv_lu() */
-
-
-void trace_state_print (struct ParseState *parser)
-
-{
-
-    /*
-    long line_num;
-    const char *p;
-    char c;
-    const char *begin;
-    */
-    int v;
-    TraceVariablesIter var_iter;
-    TraceVariable var;
-    int i;
-
-    if (! TopStackFrame)
-        return;
-
-    /*
-    fprintf(stderr, "%s:%d (%d): ",
-            parser->FileName, parser->Line, parser->CharacterPos);
-    p = parser->SourceText;
-    line_num = 1;
-    while ((c = *p) != '\0') {
-        p ++;
-        if (c == '\n') {
-            line_num ++;
-            if (line_num == parser->Line)
-                break;
-        }
-    }
-    begin = p;
-    while ((c = *p) != '\0' && c != '\n')
-        p ++;
-    fprintf(stderr, "%.*s\n", (int)(p - begin), begin);
-    */
-
-    fprintf(stderr, "{");
-
-    print_kv_s("filename", parser->FileName);
-    print_kv_ld("line", (long)(parser->Line - 1));
-    print_kv_ld("column", (long)(parser->CharacterPos));
-
-    fprintf(stderr, "\"vars\":[");
-    v = trace_variables_iter_open(&var_iter);
-    if (v != 0)
-        return;
-    while (1) {
-        v = trace_variables_iter_next(&var_iter, &var);
-        if (v != 0)
-            break;
-        fprintf(stderr, "{");
-        if (var.func_name == NULL) {
-            print_kv_s("storage", "global");
-            print_kv_s("function", "");
-        } else {
-            print_kv_s("storage", "local");
-            print_kv_s("function", var.func_name);
-        }
-        print_kv_s("name", var.var_name);
-        print_kv_lu("address", var.address);
-        print_kv_s("type", Base_type_str[var.type]);
-        /* print_kv_ld("is_array", var.is_array); */
-        if (var.is_array) {
-            /* print_kv_ld("array_len", var.array_len); */
-            if (var.type == TypeInt) {
-                print_kv_lu("unit_size", sizeof(var.v.array_i[0]));
-                fprintf(stderr, "\"value\":[");
-                for (i = 0; i < var.array_len; i ++)
-                    fprintf(stderr, "%d,", var.v.array_i[i]);
-                fprintf(stderr, "\"_dummy\"],");
-            } else if (var.type == TypePointer) {
-                print_kv_lu("unit_size", sizeof(var.v.array_ptr[0]));
-                fprintf(stderr, "\"value\":[");
-                for (i = 0; i < var.array_len; i ++)
-                    fprintf(stderr, "%lu,",
-                            (unsigned long)var.v.array_ptr[i]);
-                fprintf(stderr, "\"_dummy\"],");
-            }
-        } else {
-            if (var.type == TypeInt) {
-                print_kv_lu("unit_size", sizeof(var.v.i));
-                print_kv_ld("value", var.v.i);
-            } else if (var.type == TypePointer) {
-                print_kv_lu("unit_size", sizeof(var.v.ptr));
-                print_kv_lu("value", (unsigned long)var.v.ptr);
-            }
-        }
-        fprintf(stderr, "\"_dummy\":0},");
-    }
-    trace_variables_iter_close(&var_iter);
-    fprintf(stderr, "\"_dummy\"],");
-
-    fprintf(stderr, "\"_dummy\":0}");
-
-    fprintf(stderr, "\n");
-
-    fflush(stderr);
-    getchar();
-
-} /* trace_state_print() */
 
 char *read_stdout(char *file_name)
 {
@@ -446,12 +166,11 @@ json_t* get_stack_frames(json_t *address_dict)
 
                 if (! te->p.v.Val->IsLValue)
                     continue;
-                trace_variable_fill(&var, te);
+                trace_variable_fill(&var, te, NULL);
 
                 sprintf(buf1, "%lu", (unsigned long)var.address);
                 sprintf(buf2, "%s.%s", sf->FuncName, var.var_name);
                 json_object_set_new(address_dict, buf1, json_string(buf2));
-                //fprintf(stderr, "#### %s\n", buf);
             }
         }
 
@@ -464,29 +183,75 @@ json_t* get_stack_frames(json_t *address_dict)
 
             if (! te->p.v.Val->IsLValue)
                 continue;
-            trace_variable_fill(&var, te);
+            trace_variable_fill(&var, te, NULL);
 
             sprintf(buf1, "%lu", (unsigned long)var.address);
             json_object_set_new(address_dict, buf1, json_string(var.var_name));
-            //fprintf(stderr, "#### %s\n", buf);
         }
     }
 
     return stack_frames;
 }
 
+json_t *get_basic_type(TraceVariable *var, union AnyValue *any_value, ObjectType obj_type)
+{
+    json_t *val;
+    char buf[25];
+
+    val = json_array();
+    if (var->type == TypeInt || var->type == TypeShort ||
+        var->type == TypeLong || var->type == TypeUnsignedInt ||
+        var->type == TypeUnsignedShort || var->type == TypeUnsignedLong){
+
+        if (obj_type == STRUCT_OBJECT){
+            json_array_append_new(val, json_string(var->var_name));
+            json_array_append_new(val, json_integer(var->v.i));
+        }else{
+            json_array_append_new(val, json_string("ADDR"));
+            json_array_append_new(val, json_integer(var->address));
+            json_array_append_new(val, json_integer(var->v.i));
+        }
+
+    }else if(var->type == TypeChar){
+        sprintf(buf, "%c", var->v.c);
+
+        if (obj_type == STRUCT_OBJECT){
+            json_array_append_new(val, json_string(var->var_name));
+            json_array_append_new(val, json_string(buf));
+        }else{
+
+            json_array_append_new(val, json_string("ADDR"));
+            json_array_append_new(val, json_integer(var->address));
+            json_array_append_new(val, json_string(buf));
+        }
+    }
+    else if(var->type == TypeFP){
+
+        val = json_real(var->v.d);
+    }else if(var->type == TypePointer){
+
+        json_array_append_new(val, json_string("POINTS"));
+        json_array_append_new(val, json_integer((unsigned long)var->v.ptr));
+        json_array_append_new(val, json_integer((unsigned long)var->address));
+    }
+
+    return val;
+}
+
 void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
                     json_t *heap, json_t *address_dict, TraceVariable *var)
 {
-    json_t *val, *heapobj, *pointee, *tmpval;
+    json_t *val, *heapobj, *tmpval, *empty;
     char buf[25];
-    unsigned long ptr;
     int i;
+    const struct TableEntry *te;
+    TraceVariable var_struct;
+    ObjectType obj_type;
 
     json_array_append_new(ordered_varnames, json_string(var->var_name));
-    val = json_array();
 
     if (var->is_array) {
+        val = json_array();
         if (var->type == TypeInt) {
             heapobj = json_array();
 
@@ -504,7 +269,6 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
                 json_array_append_new(tmpval, json_integer(var->v.array_i[i]));
 
                 json_array_append_new(heapobj, tmpval);
-                //json_array_append_new(heapobj, json_integer(var->v.array_i[i]));
             }
 
             json_object_set_new(heap, buf, heapobj);
@@ -522,54 +286,41 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
         return;
     }
 
-    if (var->type == TypeInt || var->type == TypeShort ||
-        var->type == TypeLong || var->type == TypeUnsignedInt ||
-        var->type == TypeUnsignedShort || var->type == TypeUnsignedLong){
-
-        json_array_append_new(val, json_string("ADDR"));
-        json_array_append_new(val, json_integer(var->address));
-        json_array_append_new(val, json_integer(var->v.i));
-        json_object_set_new(encoded_locals, var->var_name, val);
-        //json_object_set_new(encoded_locals, var->var_name, json_integer(var->v.i));
-
-    }else if(var->type == TypeFP){
-        json_object_set_new(encoded_locals, var->var_name, json_real(var->v.d));
-    }else if(var->type == TypePointer){
-        /*
-        //fprintf(stderr, "********** %s %s \n", json_string_value(pointee), buf);
-        json_object_set(encoded_locals, var->var_name, pointee);
-        */
-
+    if (var->type == TypeStruct || var->type == TypeUnion){
         val = json_array();
+        heapobj = json_array();
+        empty = json_array();
 
-        json_object_set_new(encoded_locals, var->var_name, val);
-        json_array_append_new(val, json_string("POINTS"));
-        json_array_append_new(val, json_integer((unsigned long)var->v.ptr));
-        json_array_append_new(val, json_integer((unsigned long)var->address));
-
-        /*
-        sprintf(buf, "%lu", (unsigned long)var->v.ptr);
-        pointee = json_object_get(address_dict, buf);
-        val = json_array();
-
-        json_object_set_new(encoded_locals, var->var_name, val);
+        sprintf(buf, "%lu", (unsigned long)var->base_address);
         json_array_append_new(val, json_string("REF"));
         json_array_append_new(val, json_string(buf));
 
-        heapobj = json_array();
-        json_array_append_new(heapobj, json_string("POINTS"));
-        json_array_append(heapobj, pointee);
-        json_object_set_new(heap, buf, heapobj);
-        */
-    }
+        json_array_append_new(heapobj, json_string("CLASS"));
+        json_array_append_new(heapobj, json_string(var->identifier));
+        json_array_append_new(heapobj, empty);
 
+        obj_type = STRUCT_OBJECT;
+        for(i=0; i<var->v.tbl->Size; i++){
+            te = var->v.tbl->HashTable[i];
+            if (te==NULL)
+                continue;
+
+            trace_variable_fill(&var_struct, te, var->base_address);
+            tmpval = get_basic_type(&var_struct, NULL, obj_type);
+            json_array_append_new(heapobj, tmpval);
+        }
+        json_object_set_new(heap, buf, heapobj);
+
+    }else{
+        obj_type = ARRAY_OBJECT;
+        val = get_basic_type(var, NULL, obj_type);
+    }
+    json_object_set_new(encoded_locals, var->var_name, val);
 }
 
 void trace_state_printv1 (struct ParseState *parser)
 {
 
-    int v;
-    TraceVariablesIter var_iter;
     TraceVariable var;
     char *std_output, *json_output;
     json_t *object, *globals, *ordered_globals, *address_dict;
@@ -597,9 +348,11 @@ void trace_state_printv1 (struct ParseState *parser)
     json_object_set_new(object, "func_name", json_string(TopStackFrame->FuncName));
     json_object_set_new(object, "heap", heap);
 
+    /*
     v = trace_variables_iter_open(&var_iter);
     if (v != 0)
         return;
+    */
 
     /*
      * Store all globals.
@@ -611,7 +364,7 @@ void trace_state_printv1 (struct ParseState *parser)
 
             if (! te->p.v.Val->IsLValue)
                 continue;
-            trace_variable_fill(&var, te);
+            trace_variable_fill(&var, te, NULL);
 
             if(strncmp(var.var_name, "__exit_value", 12)==0)
                 continue;
@@ -649,7 +402,7 @@ void trace_state_printv1 (struct ParseState *parser)
                 if (! te->p.v.Val->IsLValue)
                     continue;
 
-                trace_variable_fill(&var, te);
+                trace_variable_fill(&var, te, NULL);
                 store_variable(ordered_varnames, encoded_locals, heap, address_dict, &var);
             }
         }
@@ -691,7 +444,5 @@ void trace_state_printv1 (struct ParseState *parser)
 
     json_decref(object);
     json_decref(address_dict);
-
-    //getchar();
 }
 
