@@ -54,4 +54,5 @@ cstdlib/errno.o: cstdlib/errno.c interpreter.h platform.h
 cstdlib/ctype.o: cstdlib/ctype.c interpreter.h platform.h
 cstdlib/stdbool.o: cstdlib/stdbool.c interpreter.h platform.h
 cstdlib/unistd.o: cstdlib/unistd.c interpreter.h platform.h
-trace.o: trace.c trace.h interpreter.h libs/include/jansson.h
+trace.o: trace.c trace.h interpreter.h platform.h libs/include/jansson.h
+

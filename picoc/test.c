@@ -1,36 +1,20 @@
-int N;
+#include<stdio.h>
 
-
-void f (int *b)
-
+int main()
 {
+    int TEST = 1;
+    int i = 0;
+    float a = 1.2;
 
-    int j;
-
-    j = 3;
-
-    b[j] = 15;
-
-} /* f() */
-
-
-int main (void)
-
-{
-
-    int i;
-    int a[10];
-    int *p;
-
-    i = 5;
-    N = 10;
-
-    f(a);
-
-    p = &i;
-
-    *p = 20;
-
-    return 0;
-
-} /* main() */
+    printf("Hello World 1\n");
+    printf("Hello World 2\n");
+    printf("%d\n", TEST);
+    printf("%d\n", i);
+    printf("%f\n", a);
+/*
+    for (int i=0;i<10;i++)
+    {
+        printf("%d\n", i + 10);
+    }
+*/
+}

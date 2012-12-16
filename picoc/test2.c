@@ -1,20 +1,16 @@
 #include<stdio.h>
 
+int INC = 10;
+
 int main()
 {
-    int TEST = 1;
-    int i = 0;
-    float a = 1.2;
-
-    printf("Hello World 1\n");
-    printf("Hello World 2\n");
-    printf("%d\n", TEST);
-    printf("%d\n", i);
-    printf("%f\n", a);
-/*
-    for (int i=0;i<10;i++)
-    {
-        printf("%d\n", i + 10);
+    int arr[5] = {1,2,3,4,5};
+    int i;
+    int *p = &arr[0];
+    for(i=0;i<5;i++){
+        printf("arr[%d]: %d\n", i, arr[i]);
+        *p = *p + INC;
+        printf("arr[%d]: %d\n", i, arr[i]);
+        p += 1;
     }
-*/
 }
