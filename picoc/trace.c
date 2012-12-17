@@ -35,17 +35,31 @@ static void trace_variable_fill (TraceVariable *var,
                                  const struct TableEntry *entry,
                                  char *base_addr)
 {
-
+    long array_type_size;
+    enum BaseType type;
+    struct ValueType *from_type;
     /* var->func_name = NULL; */
     union AnyValue *any_value;
     var->var_name = entry->p.v.Key;
     var->address = (unsigned long)entry->p.v.Val->Val;
     var->is_array = entry->p.v.Val->Typ->Base == TypeArray;
+    /*
     var->type = var->is_array ?
                   entry->p.v.Val->Typ->FromType->Base :
                   entry->p.v.Val->Typ->Base;
+    */
     if (var->is_array) {
-        var->array_len = entry->p.v.Val->Typ->ArraySize;
+        /*var->array_len = entry->p.v.Val->Typ->ArraySize;*/
+        from_type = entry->p.v.Val->Typ->FromType;
+        while (from_type != NULL){
+            array_type_size = from_type->Sizeof;
+            type = from_type->Base;
+            from_type = from_type->FromType;
+        }
+
+        var->type = type;
+        var->array_len = (entry->p.v.Val->Typ->Sizeof) / array_type_size;
+
         switch (var->type) {
             case TypeInt:
                 var->v.array_i =
@@ -59,6 +73,7 @@ static void trace_variable_fill (TraceVariable *var,
             break;
         }
     } else {
+        var->type = entry->p.v.Val->Typ->Base;
         switch (var->type) {
             case TypeInt:
                 if (base_addr != NULL){
