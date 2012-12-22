@@ -1989,7 +1989,7 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
         d3DomElement.append('<table class="' + label + 'Tbl"></table>');
         var tbl = d3DomElement.children('table');
 
-        if (obj[0] == 'LIST' || obj[0] == 'TUPLE' || obj[0] == 'ARRAY') {
+        if (obj[0] == 'LIST' || obj[0] == 'TUPLE') {
           tbl.append('<tr></tr><tr></tr>');
           var headerTr = tbl.find('tr:first');
           var contentTr = tbl.find('tr:last');
@@ -2004,6 +2004,64 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
             contentTr.append('<td class="'+ label + 'Elt"></td>');
             renderNestedObject(val, contentTr.find('td:last'));
           });
+        }else if(obj[0] == 'ARRAY'){
+          tbl.append('<tr></tr><tr></tr>');
+          var headerTr = tbl.find('tr:first');
+          var contentTr = tbl.find('tr:last');
+          var dimension = obj[1].length;
+          if (dimension == 1){
+            $.each(obj, function(ind, val) {
+              if (ind < 2) return; // skip type tag and ID entry
+
+              // add a new column and then pass in that newly-added column
+              // as d3DomElement to the recursive call to child:
+              headerTr.append('<td class="' + label + 'Header"></td>');
+              headerTr.find('td:last').append(ind - 2);
+
+              contentTr.append('<td class="'+ label + 'Elt"></td>');
+              renderNestedObject(val, contentTr.find('td:last'));
+            });
+          }else if(dimension == 2){
+            var indxI;
+            var indxJ;
+            var indxL = 2;
+            var val;
+            for(indxI = 0; indxI < obj[1][0]; indxI++){
+                for(indxJ = 0; indxJ < obj[1][1]; indxJ++){
+                  val = obj[indxL];
+
+                  headerTr.append('<td class="' + label + 'Header"></td>');
+                  headerTr.find('td:last').append(indxI + "," + indxJ);
+
+                  contentTr.append('<td class="'+ label + 'Elt"></td>');
+                  renderNestedObject(val, contentTr.find('td:last'));
+
+                  indxL += 1;
+                }
+            }
+          }else if(dimension == 3){
+            var indxI;
+            var indxJ;
+            var indxK;
+            var indxL = 2;
+            var val;
+            for(indxI = 0; indxI < obj[1][0]; indxI++){
+                for(indxJ = 0; indxJ < obj[1][1]; indxJ++){
+                  for(indxK = 0; indxK < obj[1][2]; indxK++){
+                    val = obj[indxL];
+
+                    headerTr.append('<td class="' + label + 'Header"></td>');
+                    headerTr.find('td:last').append(indxI + "," + indxJ + "," + indxK);
+
+                    contentTr.append('<td class="'+ label + 'Elt"></td>');
+                    renderNestedObject(val, contentTr.find('td:last'));
+
+                    indxL += 1;
+                  }
+                }
+            }
+
+          }
         }
         else if (obj[0] == 'SET') {
           // create an R x C matrix:

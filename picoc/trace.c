@@ -4,6 +4,7 @@
 
 #include "interpreter.h"
 #include "trace.h"
+#define MAX_ARRAY_DIMENSIONS 3
 
 typedef enum {
     ARRAY_OBJECT,
@@ -18,6 +19,7 @@ typedef struct TraceVariable {
     unsigned long address;
     int is_array;
     long array_len;
+    int array_dimensions[MAX_ARRAY_DIMENSIONS];
     enum BaseType type;
     union {
         char c;
@@ -38,6 +40,7 @@ static void trace_variable_fill (TraceVariable *var,
     long array_type_size;
     enum BaseType type;
     struct ValueType *from_type;
+    int i;
     /* var->func_name = NULL; */
     union AnyValue *any_value;
     var->var_name = entry->p.v.Key;
@@ -50,8 +53,20 @@ static void trace_variable_fill (TraceVariable *var,
     */
     if (var->is_array) {
         /*var->array_len = entry->p.v.Val->Typ->ArraySize;*/
+        /* -1 is invalid and make everything invalid */
+        for(i=0; i<MAX_ARRAY_DIMENSIONS; i++){
+            var->array_dimensions[i] = -1;
+        }
+        i = 0;
         from_type = entry->p.v.Val->Typ->FromType;
+        var->array_dimensions[i] = entry->p.v.Val->Typ->ArraySize;
+        i += 1;
         while (from_type != NULL){
+            if (i < MAX_ARRAY_DIMENSIONS && from_type->Base == TypeArray){
+                var->array_dimensions[i] = from_type->ArraySize;
+                i += 1;
+            }
+
             array_type_size = from_type->Sizeof;
             type = from_type->Base;
             from_type = from_type->FromType;
@@ -70,7 +85,7 @@ static void trace_variable_fill (TraceVariable *var,
                   (void **)(entry->p.v.Val->Val->ArrayMem);
             break;
             default:
-            break;
+                break;
         }
     } else {
         var->type = entry->p.v.Val->Typ->Base;
@@ -256,7 +271,7 @@ json_t *get_basic_type(TraceVariable *var, union AnyValue *any_value, ObjectType
 void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
                     json_t *heap, json_t *address_dict, TraceVariable *var)
 {
-    json_t *val, *heapobj, *tmpval, *empty;
+    json_t *val, *heapobj, *tmpval, *empty, *tmpval1;
     char buf[25];
     int i;
     const struct TableEntry *te;
@@ -276,6 +291,14 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
             json_array_append_new(val, json_string(buf));
 
             json_array_append_new(heapobj, json_string("ARRAY"));
+            /* array dimensions */
+            tmpval1 = json_array();
+            for(i=0; i<MAX_ARRAY_DIMENSIONS; i++){
+                if (var->array_dimensions[i] != -1)
+                    json_array_append_new(tmpval1, json_integer(var->array_dimensions[i]));
+            }
+            json_array_append_new(heapobj, tmpval1);
+
             for (i = 0; i < var->array_len; i ++){
                 tmpval = json_array();
 

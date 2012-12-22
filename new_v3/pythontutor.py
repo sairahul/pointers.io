@@ -102,7 +102,6 @@ class ExecScript(webapp2.RequestHandler):
     json_output = json.dumps(json_obj, indent=None)
     self.response.out.write(json_output)
 
-
 class StaticFileHandler(webapp2.RequestHandler):
     def get(self, path):
         abs_path = os.path.abspath(path)
