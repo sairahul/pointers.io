@@ -2009,7 +2009,7 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
           var headerTr = tbl.find('tr:first');
           var contentTr = tbl.find('tr:last');
           var dimension = obj[1].length;
-          if (dimension == 1){
+          if (dimension <= 1){
             $.each(obj, function(ind, val) {
               if (ind < 2) return; // skip type tag and ID entry
 
@@ -2110,9 +2110,10 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
         }
       }
     }
-    else if (obj[0] == 'INSTANCE' || obj[0] == 'CLASS' || obj[0] == 'POINTS') {
+    else if (obj[0] == 'INSTANCE' || obj[0] == 'CLASS' || obj[0] == 'POINTS' || obj[0] == 'STRUCT' || obj[0] == 'UNION') {
       var isInstance = (obj[0] == 'INSTANCE');
       var isPointer = (obj[0] == 'POINTS');
+      var isStructUnion = (obj[0] == 'STRUCT' || obj[0] == 'UNION');
       //var headerLength = isInstance ? 2 : 3;
       var headerLength = (isInstance || isPointer) ? 2 : 3;
 
@@ -2124,7 +2125,10 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
       else if(isPointer){
         //d3DomElement.append('<div class="typeLabel"> Points to ' + obj[1] + '</div>');
       }
-      else {
+      else if(isStructUnion){
+        d3DomElement.append('<div class="typeLabel">' + obj[0].toLowerCase() + ' ' + obj[1] + '</div>');
+      }
+      else{
         var superclassStr = '';
         if (obj[2].length > 0) {
           superclassStr += ('[extends ' + obj[2].join(', ') + '] ');

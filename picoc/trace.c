@@ -8,44 +8,86 @@
 
 typedef enum {
     ARRAY_OBJECT,
-    STRUCT_OBJECT
+    STRUCT_OBJECT,
+    NORMAL_OBJECT
 } ObjectType;
+
+union anyvalue {
+    char c;
+    long i;
+    double d;
+    struct Table *tbl;
+
+    const int *array_i;
+    const char *array_mem;
+    void *ptr;
+    void **array_ptr;
+};
 
 typedef struct TraceVariable {
     const char *func_name;
-    const char *var_name;
-    const char *identifier;
-    const char *base_address;
     unsigned long address;
+    const char *var_name; /* variable name */
+
+    const char *identifier; /* struct/union name */
+    const char *base_address; /* base address for struct/union */
+    int size;
+
     int is_array;
     long array_len;
-    int array_dimensions[MAX_ARRAY_DIMENSIONS];
-    enum BaseType type;
-    union {
-        char c;
-        long i;
-        double d;
-        struct Table *tbl;
+    int array_dimensions[MAX_ARRAY_DIMENSIONS]; /* array dimension */
 
-        const int *array_i;
-        void *ptr;
-        void **array_ptr;
-    } v;
+    enum BaseType type; /* type of variable */
+    union anyvalue v;
 } TraceVariable;
+
+long get_integer_value(enum BaseType type, union AnyValue *any_value){
+    long value;
+    switch(type){
+        case TypeInt:
+            value = any_value->Integer;
+            break;
+        case TypeShort:
+            value = any_value->ShortInteger;
+            break;
+        case TypeLong:
+            value = any_value->LongInteger;
+            break;
+        case TypeUnsignedInt:
+            value = any_value->UnsignedInteger;
+            break;
+        case TypeUnsignedShort:
+            value = any_value->UnsignedShortInteger;
+            break;
+        case TypeUnsignedLong:
+            value = any_value->UnsignedLongInteger;
+            break;
+        default:
+            break;
+    }
+    return value;
+}
 
 static void trace_variable_fill (TraceVariable *var,
                                  const struct TableEntry *entry,
                                  char *base_addr)
 {
     long array_type_size;
-    enum BaseType type;
-    struct ValueType *from_type;
-    int i;
+    struct ValueType *from_type, *type, *entry_type;
+    int i, is_identifier = 0;
     /* var->func_name = NULL; */
-    union AnyValue *any_value;
+    union AnyValue *any_value=NULL;
     var->var_name = entry->p.v.Key;
     var->address = (unsigned long)entry->p.v.Val->Val;
     var->is_array = entry->p.v.Val->Typ->Base == TypeArray;
+    entry_type = entry->p.v.Val->Typ;
+
+    if (entry_type->Base == TypePointer && entry_type->FromType != NULL &&
+            entry_type->FromType->Base == TypeChar){
+        var->is_array = 1;
+        is_identifier = 1;
+    }
+
     /*
     var->type = var->is_array ?
                   entry->p.v.Val->Typ->FromType->Base :
@@ -68,62 +110,53 @@ static void trace_variable_fill (TraceVariable *var,
             }
 
             array_type_size = from_type->Sizeof;
-            type = from_type->Base;
+            type = from_type;
             from_type = from_type->FromType;
+
+            if (type->Base == TypeStruct || type->Base == TypeUnion)
+                break;
         }
 
-        var->type = type;
+        var->type = type->Base;
         var->array_len = (entry->p.v.Val->Typ->Sizeof) / array_type_size;
+        var->size = type->Sizeof;
 
         switch (var->type) {
+            /*
             case TypeInt:
                 var->v.array_i =
                   (int *)(entry->p.v.Val->Val->ArrayMem);
-            break;
+                break;
+            */
             case TypePointer:
                 var->v.array_ptr =
                   (void **)(entry->p.v.Val->Val->ArrayMem);
-            break;
+                break;
+            case TypeUnion:
+            case TypeStruct:
+                var->base_address = (char *)entry->p.v.Val->Val->ArrayMem;
+                var->v.tbl = type->Members;
+                var->identifier = type->Identifier;
+                break;
             default:
+                if(is_identifier == 1)
+                    var->v.array_mem = entry->p.v.Val->Val->Identifier;
+                else
+                    var->v.array_mem = (char *)(entry->p.v.Val->Val->ArrayMem);
                 break;
         }
     } else {
         var->type = entry->p.v.Val->Typ->Base;
+        if (base_addr != NULL){
+            any_value = (union AnyValue *)(base_addr + entry->p.v.Val->Val->Integer);
+            var->address = (unsigned long)any_value;
+        }else{
+            any_value = entry->p.v.Val->Val;
+        }
+        /*
+         * base_addr is not tested for FP or Struct/Union
+         */
         switch (var->type) {
-            case TypeInt:
-                if (base_addr != NULL){
-                    any_value = (union AnyValue *)(base_addr + entry->p.v.Val->Val->Integer);
-                    var->v.i = any_value->Integer;
-                }else{
-                    var->v.i = entry->p.v.Val->Val->Integer;
-                }
-                break;
-            case TypePointer:
-                var->v.ptr = entry->p.v.Val->Val->Pointer;
-                break;
-            case TypeChar:
-                if (base_addr != NULL){
-                    any_value = (union AnyValue *)(base_addr + entry->p.v.Val->Val->Integer);
-                    var->v.i = any_value->Character;
-                }else{
-                    var->v.c = entry->p.v.Val->Val->Character;
-                }
-                break;
-            case TypeShort:
-                var->v.i = entry->p.v.Val->Val->ShortInteger;
-                break;
-            case TypeLong:
-                var->v.i = entry->p.v.Val->Val->LongInteger;
-                break;
-            case TypeUnsignedInt:
-                var->v.i = entry->p.v.Val->Val->UnsignedInteger;
-                break;
-            case TypeUnsignedShort:
-                var->v.i = entry->p.v.Val->Val->UnsignedShortInteger;
-                break;
-            case TypeUnsignedLong:
-                var->v.i = entry->p.v.Val->Val->UnsignedLongInteger;
-                break;
             case TypeFP:
                 var->v.d = entry->p.v.Val->Val->FP;
                 break;
@@ -132,8 +165,16 @@ static void trace_variable_fill (TraceVariable *var,
                 var->base_address = (char *)entry->p.v.Val->Val;
                 var->v.tbl = entry->p.v.Val->Typ->Members;
                 var->identifier = entry->p.v.Val->Typ->Identifier;
+                var->size = entry->p.v.Val->Typ->Sizeof;
+                break;
+            case TypeChar:
+                var->v.c = any_value->Character;
+                break;
+            case TypePointer:
+                var->v.ptr = entry->p.v.Val->Val->Pointer;
                 break;
             default:
+                var->v.i = get_integer_value(var->type, any_value);
                 break;
         }
     }
@@ -223,36 +264,71 @@ json_t* get_stack_frames(json_t *address_dict)
     return stack_frames;
 }
 
+void copy_char(char *buf, char c)
+{
+    char *term = "\\0";
+    if (c == '\0')
+        sprintf(buf, "%s", term);
+    else
+        sprintf(buf, "%c", c);
+}
+
 json_t *get_basic_type(TraceVariable *var, union AnyValue *any_value, ObjectType obj_type)
 {
-    json_t *val;
+    json_t *val, *tmp;
     char buf[25];
+    unsigned long address;
+    long value;
+
+    if (any_value != NULL){
+        address = (unsigned long)any_value;
+    }else{
+        address = var->address;
+    }
 
     val = json_array();
+
     if (var->type == TypeInt || var->type == TypeShort ||
         var->type == TypeLong || var->type == TypeUnsignedInt ||
         var->type == TypeUnsignedShort || var->type == TypeUnsignedLong){
 
+        json_array_append_new(val, json_string("ADDR"));
+        json_array_append_new(val, json_integer(address));
+
         if (obj_type == STRUCT_OBJECT){
-            json_array_append_new(val, json_string(var->var_name));
             json_array_append_new(val, json_integer(var->v.i));
-        }else{
-            json_array_append_new(val, json_string("ADDR"));
-            json_array_append_new(val, json_integer(var->address));
+
+            tmp = json_array();
+            json_array_append_new(tmp, json_string(var->var_name));
+            json_array_append_new(tmp, val);
+            val = tmp;
+        }else if (obj_type == ARRAY_OBJECT){
+            value = get_integer_value(var->type, any_value);
+            json_array_append_new(val, json_integer(value));
+        }
+        else{
             json_array_append_new(val, json_integer(var->v.i));
         }
 
     }else if(var->type == TypeChar){
-        sprintf(buf, "%c", var->v.c);
+        if (obj_type == ARRAY_OBJECT){
+            copy_char(buf, any_value->Character);
+            /*sprintf(buf, "%c", any_value->Character);*/
+        }else{
+            copy_char(buf, var->v.c);
+            /*sprintf(buf, "%c", var->v.c);*/
+        }
+
+        json_array_append_new(val, json_string("ADDR"));
+        json_array_append_new(val, json_integer(address));
+        json_array_append_new(val, json_string(buf));
 
         if (obj_type == STRUCT_OBJECT){
-            json_array_append_new(val, json_string(var->var_name));
-            json_array_append_new(val, json_string(buf));
-        }else{
+            tmp = json_array();
 
-            json_array_append_new(val, json_string("ADDR"));
-            json_array_append_new(val, json_integer(var->address));
-            json_array_append_new(val, json_string(buf));
+            json_array_append_new(tmp, json_string(var->var_name));
+            json_array_append_new(tmp, val);
+            val = tmp;
         }
     }
     else if(var->type == TypeFP){
@@ -262,7 +338,7 @@ json_t *get_basic_type(TraceVariable *var, union AnyValue *any_value, ObjectType
 
         json_array_append_new(val, json_string("POINTS"));
         json_array_append_new(val, json_integer((unsigned long)var->v.ptr));
-        json_array_append_new(val, json_integer((unsigned long)var->address));
+        json_array_append_new(val, json_integer(address));
     }
 
     return val;
@@ -277,12 +353,24 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
     const struct TableEntry *te;
     TraceVariable var_struct;
     ObjectType obj_type;
+    union AnyValue *any_value;
 
     json_array_append_new(ordered_varnames, json_string(var->var_name));
 
     if (var->is_array) {
         val = json_array();
-        if (var->type == TypeInt) {
+        if (var->type == TypePointer){
+            /*
+            print_kv_lu("unit_size", sizeof(var.v.array_ptr[0]));
+            fprintf(stderr, "\"value\":[");
+            for (i = 0; i < var.array_len; i ++)
+                fprintf(stderr, "%lu,",
+                        (unsigned long)var.v.array_ptr[i]);
+            fprintf(stderr, "\"_dummy\"],");
+            */
+        }else if(var->type == TypeStruct || var->type == TypeUnion){
+            /* TODO */
+        }else{
             heapobj = json_array();
 
             json_object_set_new(encoded_locals, var->var_name, val);
@@ -301,25 +389,17 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
 
             for (i = 0; i < var->array_len; i ++){
                 tmpval = json_array();
-
+                any_value = (union AnyValue *)((char *)var->v.array_mem + i*var->size);
+                tmpval = get_basic_type(var, any_value, ARRAY_OBJECT);
+                /*
                 json_array_append_new(tmpval, json_string("ADDR"));
                 json_array_append_new(tmpval, json_integer((var->address) + (i*sizeof(var->v.array_i[i]))));
                 json_array_append_new(tmpval, json_integer(var->v.array_i[i]));
-
+                */
                 json_array_append_new(heapobj, tmpval);
             }
 
             json_object_set_new(heap, buf, heapobj);
-
-        } else if (var->type == TypePointer) {
-            /*
-            print_kv_lu("unit_size", sizeof(var.v.array_ptr[0]));
-            fprintf(stderr, "\"value\":[");
-            for (i = 0; i < var.array_len; i ++)
-                fprintf(stderr, "%lu,",
-                        (unsigned long)var.v.array_ptr[i]);
-            fprintf(stderr, "\"_dummy\"],");
-            */
         }
         return;
     }
@@ -333,7 +413,11 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
         json_array_append_new(val, json_string("REF"));
         json_array_append_new(val, json_string(buf));
 
-        json_array_append_new(heapobj, json_string("CLASS"));
+        if(var->type == TypeStruct)
+            json_array_append_new(heapobj, json_string("STRUCT"));
+        else
+            json_array_append_new(heapobj, json_string("UNION"));
+
         json_array_append_new(heapobj, json_string(var->identifier));
         json_array_append_new(heapobj, empty);
 
@@ -350,8 +434,8 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
         json_object_set_new(heap, buf, heapobj);
 
     }else{
-        obj_type = ARRAY_OBJECT;
-        val = get_basic_type(var, NULL, obj_type);
+        /*obj_type = ARRAY_OBJECT;*/
+        val = get_basic_type(var, NULL, NORMAL_OBJECT);
     }
     json_object_set_new(encoded_locals, var->var_name, val);
 }
