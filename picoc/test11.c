@@ -2,13 +2,13 @@
 
 struct ABC{
     int a;
-    char c;
+    char c[4];
 };
 
 int main(){
     struct ABC a;
     a.a = 10;
-    a.c = 'A';
+    a.c[0] = 'A';
 
     return 0;
 }

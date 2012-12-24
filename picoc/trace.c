@@ -88,11 +88,13 @@ static void trace_variable_fill (TraceVariable *var,
         is_identifier = 1;
     }
 
-    /*
-    var->type = var->is_array ?
-                  entry->p.v.Val->Typ->FromType->Base :
-                  entry->p.v.Val->Typ->Base;
-    */
+    if (base_addr != NULL){
+        any_value = (union AnyValue *)(base_addr + entry->p.v.Val->Val->Integer);
+        var->address = (unsigned long)any_value;
+    }else{
+        any_value = entry->p.v.Val->Val;
+    }
+
     if (var->is_array) {
         /*var->array_len = entry->p.v.Val->Typ->ArraySize;*/
         /* -1 is invalid and make everything invalid */
@@ -122,47 +124,37 @@ static void trace_variable_fill (TraceVariable *var,
         var->size = type->Sizeof;
 
         switch (var->type) {
-            /*
-            case TypeInt:
-                var->v.array_i =
-                  (int *)(entry->p.v.Val->Val->ArrayMem);
-                break;
-            */
             case TypePointer:
                 var->v.array_ptr =
-                  (void **)(entry->p.v.Val->Val->ArrayMem);
+                  (void **)(any_value->ArrayMem);
                 break;
             case TypeUnion:
             case TypeStruct:
-                var->base_address = (char *)entry->p.v.Val->Val->ArrayMem;
+                var->base_address = (char *)any_value->ArrayMem;
                 var->v.tbl = type->Members;
                 var->identifier = type->Identifier;
+                var->size = type->Sizeof;
                 break;
             default:
-                if(is_identifier == 1)
-                    var->v.array_mem = entry->p.v.Val->Val->Identifier;
-                else
-                    var->v.array_mem = (char *)(entry->p.v.Val->Val->ArrayMem);
+                if(is_identifier){
+                    var->v.array_mem = any_value->Identifier;
+                }else{
+                    var->v.array_mem = (char *)(any_value->ArrayMem);
+                }
                 break;
         }
     } else {
         var->type = entry->p.v.Val->Typ->Base;
-        if (base_addr != NULL){
-            any_value = (union AnyValue *)(base_addr + entry->p.v.Val->Val->Integer);
-            var->address = (unsigned long)any_value;
-        }else{
-            any_value = entry->p.v.Val->Val;
-        }
         /*
          * base_addr is not tested for FP or Struct/Union
          */
         switch (var->type) {
             case TypeFP:
-                var->v.d = entry->p.v.Val->Val->FP;
+                var->v.d = any_value->FP;
                 break;
             case TypeUnion:
             case TypeStruct:
-                var->base_address = (char *)entry->p.v.Val->Val;
+                var->base_address = (char *)any_value;
                 var->v.tbl = entry->p.v.Val->Typ->Members;
                 var->identifier = entry->p.v.Val->Typ->Identifier;
                 var->size = entry->p.v.Val->Typ->Sizeof;
@@ -171,7 +163,7 @@ static void trace_variable_fill (TraceVariable *var,
                 var->v.c = any_value->Character;
                 break;
             case TypePointer:
-                var->v.ptr = entry->p.v.Val->Val->Pointer;
+                var->v.ptr = any_value->Pointer;
                 break;
             default:
                 var->v.i = get_integer_value(var->type, any_value);
@@ -344,21 +336,37 @@ json_t *get_basic_type(TraceVariable *var, union AnyValue *any_value, ObjectType
     return val;
 }
 
-void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
-                    json_t *heap, json_t *address_dict, TraceVariable *var)
+json_t *store_variable(json_t *ordered_varnames, json_t *encoded_locals,
+                    json_t *heap, TraceVariable *var, int compound_obj,
+                    ObjectType obj_type)
 {
-    json_t *val, *heapobj, *tmpval, *empty, *tmpval1;
+    json_t *val, *heapobj = NULL, *tmpval, *empty, *tmpval1;
     char buf[25];
     int i;
     const struct TableEntry *te;
-    TraceVariable var_struct;
-    ObjectType obj_type;
+    TraceVariable var_tmp;
     union AnyValue *any_value;
 
-    json_array_append_new(ordered_varnames, json_string(var->var_name));
+    heapobj = json_array();
+    val = json_array();
+    if (!compound_obj){
+        json_array_append_new(ordered_varnames, json_string(var->var_name));
+    }
 
     if (var->is_array) {
-        val = json_array();
+        json_array_append_new(val, json_string("REF"));
+        sprintf(buf, "%lu", (unsigned long)&var->v.array_i[0]);
+        json_array_append_new(val, json_string(buf));
+
+        json_array_append_new(heapobj, json_string("ARRAY"));
+        /* array dimensions */
+        tmpval1 = json_array();
+        for(i=0; i<MAX_ARRAY_DIMENSIONS; i++){
+            if (var->array_dimensions[i] != -1)
+                json_array_append_new(tmpval1, json_integer(var->array_dimensions[i]));
+        }
+        json_array_append_new(heapobj, tmpval1);
+
         if (var->type == TypePointer){
             /*
             print_kv_lu("unit_size", sizeof(var.v.array_ptr[0]));
@@ -369,44 +377,31 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
             fprintf(stderr, "\"_dummy\"],");
             */
         }else if(var->type == TypeStruct || var->type == TypeUnion){
-            /* TODO */
-        }else{
-            heapobj = json_array();
+            var->is_array = 0;
 
-            json_object_set_new(encoded_locals, var->var_name, val);
-            json_array_append_new(val, json_string("REF"));
-            sprintf(buf, "%lu", (unsigned long)&var->v.array_i[0]);
-            json_array_append_new(val, json_string(buf));
+            var_tmp.base_address = var->base_address;
+            var_tmp.v.tbl = var->v.tbl;
+            var_tmp.identifier = var->identifier;
+            var_tmp.size = var->size;
+            var_tmp.type = var->type;
 
-            json_array_append_new(heapobj, json_string("ARRAY"));
-            /* array dimensions */
-            tmpval1 = json_array();
-            for(i=0; i<MAX_ARRAY_DIMENSIONS; i++){
-                if (var->array_dimensions[i] != -1)
-                    json_array_append_new(tmpval1, json_integer(var->array_dimensions[i]));
+            for (i = 0; i< var->array_len; i++){
+                tmpval = store_variable(NULL, NULL, heap, &var_tmp, 1, NORMAL_OBJECT);
+                json_array_append_new(heapobj, tmpval);
+
+                var_tmp.base_address = var->base_address + ((i+1)*var->size);
             }
-            json_array_append_new(heapobj, tmpval1);
-
+        }else{
             for (i = 0; i < var->array_len; i ++){
-                tmpval = json_array();
                 any_value = (union AnyValue *)((char *)var->v.array_mem + i*var->size);
                 tmpval = get_basic_type(var, any_value, ARRAY_OBJECT);
-                /*
-                json_array_append_new(tmpval, json_string("ADDR"));
-                json_array_append_new(tmpval, json_integer((var->address) + (i*sizeof(var->v.array_i[i]))));
-                json_array_append_new(tmpval, json_integer(var->v.array_i[i]));
-                */
                 json_array_append_new(heapobj, tmpval);
             }
-
-            json_object_set_new(heap, buf, heapobj);
         }
-        return;
-    }
 
-    if (var->type == TypeStruct || var->type == TypeUnion){
-        val = json_array();
-        heapobj = json_array();
+        json_object_set_new(heap, buf, heapobj);
+
+    }else if (var->type == TypeStruct || var->type == TypeUnion){
         empty = json_array();
 
         sprintf(buf, "%lu", (unsigned long)var->base_address);
@@ -427,17 +422,28 @@ void store_variable(json_t *ordered_varnames, json_t *encoded_locals,
             if (te==NULL)
                 continue;
 
-            trace_variable_fill(&var_struct, te, var->base_address);
-            tmpval = get_basic_type(&var_struct, NULL, obj_type);
-            json_array_append_new(heapobj, tmpval);
+            trace_variable_fill(&var_tmp, te, var->base_address);
+            tmpval = store_variable(NULL, NULL, heap, &var_tmp, 1, obj_type);
+            if (var_tmp.is_array || var_tmp.type == TypeArray || var_tmp.type == TypeStruct || var_tmp.type == TypeUnion){
+                tmpval1 = json_array();
+                json_array_append_new(tmpval1, json_string(var_tmp.var_name));
+                json_array_append_new(tmpval1, tmpval);
+                json_array_append_new(heapobj, tmpval1);
+            }else{
+                /*tmpval = get_basic_type(&var_tmp, NULL, obj_type);*/
+                json_array_append_new(heapobj, tmpval);
+            }
         }
         json_object_set_new(heap, buf, heapobj);
 
     }else{
-        /*obj_type = ARRAY_OBJECT;*/
-        val = get_basic_type(var, NULL, NORMAL_OBJECT);
+        val = get_basic_type(var, NULL, obj_type);
     }
-    json_object_set_new(encoded_locals, var->var_name, val);
+
+    if(!compound_obj)
+        json_object_set_new(encoded_locals, var->var_name, val);
+
+    return val;
 }
 
 void trace_state_printv1 (struct ParseState *parser)
@@ -490,7 +496,7 @@ void trace_state_printv1 (struct ParseState *parser)
 
             if(strncmp(var.var_name, "__exit_value", 12)==0)
                 continue;
-            store_variable(ordered_globals, globals, heap, address_dict, &var);
+            store_variable(ordered_globals, globals, heap, &var, 0, NORMAL_OBJECT);
         }
     }
 
@@ -525,7 +531,7 @@ void trace_state_printv1 (struct ParseState *parser)
                     continue;
 
                 trace_variable_fill(&var, te, NULL);
-                store_variable(ordered_varnames, encoded_locals, heap, address_dict, &var);
+                store_variable(ordered_varnames, encoded_locals, heap, &var, 0, NORMAL_OBJECT);
             }
         }
 
