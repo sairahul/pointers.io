@@ -336,12 +336,20 @@ json_t *get_basic_type(TraceVariable *var, union AnyValue *any_value, ObjectType
     return val;
 }
 
-void set_null_object(json_t *heap)
+void set_null_object(json_t *heap, json_t *globals, json_t *ordered_globals)
 {
     json_t *heapobj = json_array();
-    json_array_append_new(heapobj, json_string("NULLPOINTER"));
+    json_t *val = json_array();
+
     json_array_append_new(heapobj, json_string("NULL"));
+    json_array_append_new(heapobj, json_string("0"));
     json_object_set_new(heap, "0", heapobj);
+
+    json_array_insert_new(ordered_globals, 0, json_string("NULL"));
+
+    json_array_append_new(val, json_string("REF"));
+    json_array_append_new(val, json_string("0"));
+    json_object_set_new(globals, "NULL", val);
 }
 
 json_t *store_variable(json_t *ordered_varnames, json_t *encoded_locals,
@@ -565,7 +573,7 @@ void trace_state_printv1 (struct ParseState *parser)
         json_object_set_new(stack_frame, "ordered_varnames", ordered_varnames);
         i -= 1;
     }
-    set_null_object(heap);
+    set_null_object(heap, globals, ordered_globals);
     json_object_set_new(object, "stack_to_render", stack_frames);
 
 
