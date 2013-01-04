@@ -2114,12 +2114,8 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
       var isInstance = (obj[0] == 'INSTANCE');
       var isPointer = (obj[0] == 'POINTS');
       var isStructUnion = (obj[0] == 'STRUCT' || obj[0] == 'UNION');
-      var isNullPointer = (obj[0] == 'NULLPOINTER');
       //var headerLength = isInstance ? 2 : 3;
       var headerLength = (isInstance || isPointer) ? 2 : 3;
-
-      if(!isNullPointer)
-        assert(obj.length >= headerLength);
 
       if (isInstance) {
         d3DomElement.append('<div class="typeLabel">' + obj[1] + ' instance</div>');
@@ -2130,8 +2126,6 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
       else if(isStructUnion){
         d3DomElement.append('<div class="typeLabel">' + obj[0].toLowerCase() + ' ' + obj[1] + '</div>');
       }
-      else if(isNullPointer){
-      }
       else{
         var superclassStr = '';
         if (obj[2].length > 0) {
@@ -2140,7 +2134,7 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
         d3DomElement.append('<div class="typeLabel">' + obj[1] + ' class ' + superclassStr + '</div>');
       }
 
-      if (obj.length > headerLength && !isNullPointer) {
+      if (obj.length > headerLength) {
         var lab = isInstance ? 'inst' : 'class';
         d3DomElement.append('<table class="' + lab + 'Tbl"></table>');
 
