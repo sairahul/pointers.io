@@ -33,9 +33,9 @@ def execute_code(filename, trace_file):
         columnno = stderr[1]
         msg = "\n".join(stderr[2:])
         trace = [{"exception_msg": msg,
-                  "line": lineno,
-                  "offset": columnno,
-                  "event": "error"
+                  "line": int(lineno),
+                  "offset": int(columnno),
+                  "event": "uncaught_exception"
                 }]
     else:
         tf = "%s.trace"%(trace_file)

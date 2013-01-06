@@ -58,8 +58,8 @@ void trace_set_filename(char *filename){
     if (filename != NULL){
         stdout_file = malloc(sizeof(char) * (strlen(filename) + 8));
         trace_file = malloc(sizeof(char) * (strlen(filename) + 7));
-        sprintf(stdout_file, "%s_stdout", filename);
-        sprintf(trace_file, "%s_trace", filename);
+        sprintf(stdout_file, "%s.stdout", filename);
+        sprintf(trace_file, "%s.trace", filename);
     }
     TRACE_FILES.stdout_file = stdout_file;
     TRACE_FILES.trace_file = trace_file;
@@ -77,6 +77,36 @@ void write_to_trace(const char* json_output){
     FILE *fp = fopen(trace_get_trace_file(), "a+");
     fprintf(fp, "%s\n", json_output);
     fclose(fp);
+}
+
+void trace_write_error_msg(int line, int charpos, const char *Format, va_list Args){
+
+    const char *FPos;
+
+    PrintSimpleInt(line, stderr);
+    PrintCh('\n', stderr);
+    PrintSimpleInt(charpos, stderr);
+    PrintCh('\n', stderr);
+
+    for (FPos = Format; *FPos != '\0'; FPos++)
+    {
+        if (*FPos == '%')
+        {
+            FPos++;
+            switch (*FPos)
+            {
+            case 's': PrintStr(va_arg(Args, char *), stderr); break;
+            case 'd': PrintSimpleInt(va_arg(Args, int), stderr); break;
+            case 'c': PrintCh(va_arg(Args, int), stderr); break;
+            case 't': PrintType(va_arg(Args, struct ValueType *), stderr); break;
+            case 'f': PrintFP(va_arg(Args, double), stderr); break;
+            case '%': PrintCh('%', stderr); break;
+            case '\0': FPos--; break;
+            }
+        }
+        else
+            PrintCh(*FPos, stderr);
+    }
 }
 
 long get_integer_value(enum BaseType type, union AnyValue *any_value){

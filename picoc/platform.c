@@ -1,5 +1,6 @@
 #include "picoc.h"
 #include "interpreter.h"
+#include "trace.h"
 
 /* the value passed to exit() */
 int PicocExitValue = 0;
@@ -142,6 +143,11 @@ void ProgramFail(struct ParseState *Parser, const char *Message, ...)
     PlatformVPrintf(Message, Args);
     va_end(Args);
     PlatformPrintf("\n");
+
+    va_start(Args, Message);
+    trace_write_error_msg(Parser->Line, Parser->CharacterPos, Message, Args);
+    va_end(Args);
+
     PlatformExit(1);
 }
 

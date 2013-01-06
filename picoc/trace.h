@@ -17,6 +17,8 @@
 extern "C" {
 #endif
 
+void trace_write_error_msg(int line, int charpos, const char *Fromat, va_list Args);
+
 void trace_set_filename(char *filename);
 
 const char* trace_get_stdout_file();
