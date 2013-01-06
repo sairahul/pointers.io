@@ -12,12 +12,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "trace.h"
+
 #define PICOC_STACK_SIZE (128*1024)              /* space for the the stack */
 
 int main(int argc, char **argv)
 {
     int ParamCount = 1;
     int DontRunMain = FALSE;
+    const char *stdout_file;
     int StackSize = getenv("STACKSIZE") ? atoi(getenv("STACKSIZE")) : PICOC_STACK_SIZE;
     int fd;
 
@@ -25,15 +28,13 @@ int main(int argc, char **argv)
     {
         printf("Format: picoc <csource1.c>... [- <arg1>...]    : run a program (calls main() to start it)\n"
                "        picoc -s <csource1.c>... [- <arg1>...] : script mode - runs the program without calling main()\n"
-               "        picoc -i                               : interactive mode\n");
+               "        picoc -i                               : interactive mode\n"
+               "        picoc -t                               : set the trace file name\n");
         exit(1);
     }
 
+    trace_set_filename(NULL);
     PicocInitialise(StackSize);
-
-    fd = open("stdout.txt", O_RDWR | O_CREAT | O_TRUNC | O_SYNC, S_IRUSR | S_IWUSR);
-    dup2(fd, 1);
-    close(fd);
 
     if (strcmp(argv[ParamCount], "-s") == 0 || strcmp(argv[ParamCount], "-m") == 0)
     {
@@ -46,19 +47,27 @@ int main(int argc, char **argv)
     {
         PicocIncludeAllSystemHeaders();
         PicocParseInteractive();
-    }else if(argc > ParamCount && strcmp(argv[ParamCount], "-p") == 0)
-    {
-        PicocPlatformReadStdin(argv[ParamCount]);
     }
     else
     {
+        if(argc > ParamCount && strcmp(argv[ParamCount], "-t") == 0)
+        {
+            trace_set_filename(argv[++ParamCount]);
+            ParamCount++;
+
+            stdout_file = trace_get_stdout_file();
+            fd = open(stdout_file, O_RDWR | O_CREAT | O_TRUNC | O_SYNC, S_IRUSR | S_IWUSR);
+            dup2(fd, 1);
+            close(fd);
+        }
+
         if (PicocPlatformSetExitPoint())
         {
             PicocCleanup();
             return PicocExitValue;
         }
 
-        for (; ParamCount < argc && strcmp(argv[ParamCount], "-") != 0; ParamCount++)
+        for (;ParamCount < argc && strcmp(argv[ParamCount], "-") != 0; ParamCount++)
             PicocPlatformScanFile(argv[ParamCount]);
 
         if (!DontRunMain)

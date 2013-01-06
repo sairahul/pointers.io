@@ -17,6 +17,11 @@
 extern "C" {
 #endif
 
+void trace_set_filename(char *filename);
+
+const char* trace_get_stdout_file();
+
+const char* trace_get_trace_file();
 
 void trace_state_print (struct ParseState *Parser);
 

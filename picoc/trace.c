@@ -6,6 +6,13 @@
 #include "trace.h"
 #define MAX_ARRAY_DIMENSIONS 3
 
+typedef struct TraceFiles {
+    const char *stdout_file;
+    const char *trace_file;
+} TraceFiles;
+
+TraceFiles TRACE_FILES;
+
 typedef enum {
     ARRAY_OBJECT,
     STRUCT_OBJECT,
@@ -41,6 +48,37 @@ typedef struct TraceVariable {
     union anyvalue v;
 } TraceVariable;
 
+void trace_set_filename(char *filename){
+    /*
+     * stdout_file = filename + "_stdout"
+     * trace_file = filename + "_trace"
+     */
+    char *stdout_file = NULL;
+    char *trace_file = NULL;
+    if (filename != NULL){
+        stdout_file = malloc(sizeof(char) * (strlen(filename) + 8));
+        trace_file = malloc(sizeof(char) * (strlen(filename) + 7));
+        sprintf(stdout_file, "%s_stdout", filename);
+        sprintf(trace_file, "%s_trace", filename);
+    }
+    TRACE_FILES.stdout_file = stdout_file;
+    TRACE_FILES.trace_file = trace_file;
+}
+
+const char *trace_get_stdout_file(){
+    return TRACE_FILES.stdout_file;
+}
+
+const char *trace_get_trace_file(){
+    return TRACE_FILES.trace_file;
+}
+
+void write_to_trace(const char* json_output){
+    FILE *fp = fopen(trace_get_trace_file(), "a+");
+    fprintf(fp, "%s\n", json_output);
+    fclose(fp);
+}
+
 long get_integer_value(enum BaseType type, union AnyValue *any_value){
     long value;
     switch(type){
@@ -70,7 +108,7 @@ long get_integer_value(enum BaseType type, union AnyValue *any_value){
 
 static void trace_variable_fill (TraceVariable *var,
                                  const struct TableEntry *entry,
-                                 char *base_addr)
+                                 const char *base_addr)
 {
     long array_type_size;
     struct ValueType *from_type, *type, *entry_type;
@@ -174,7 +212,7 @@ static void trace_variable_fill (TraceVariable *var,
 } /* trace_variable_fill() */
 
 
-char *read_stdout(char *file_name)
+char *read_stdout(const char *file_name)
 {
 
     char *source=NULL;
@@ -480,7 +518,7 @@ json_t *store_variable(json_t *ordered_varnames, json_t *encoded_locals,
     return val;
 }
 
-void trace_state_printv1 (struct ParseState *parser)
+void trace_state_print(struct ParseState *parser)
 {
 
     TraceVariable var;
@@ -492,7 +530,7 @@ void trace_state_printv1 (struct ParseState *parser)
     json_t *stack_frames, *stack_frame, *ordered_varnames, *encoded_locals, *heap;
     int i, stack_size, j;
 
-    if (! TopStackFrame)
+    if (!TopStackFrame || !trace_get_trace_file())
         return;
 
     object = json_object();
@@ -500,7 +538,7 @@ void trace_state_printv1 (struct ParseState *parser)
     heap = json_object();
     address_dict = json_object();
     ordered_globals = json_array();
-    std_output = read_stdout("stdout.txt");
+    std_output = read_stdout(trace_get_stdout_file());
 
     json_object_set_new(object, "line", json_integer(parser->Line));
     json_object_set_new(object, "event", json_string("step_line"));
@@ -600,7 +638,8 @@ void trace_state_printv1 (struct ParseState *parser)
     */
 
     json_output = json_dumps(object, 0);
-    fprintf(stderr, "%s\n", json_output);
+    /*fprintf(stderr, "%s\n", json_output);*/
+    write_to_trace(json_output);
 
     free(json_output);
     free(std_output);

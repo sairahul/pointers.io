@@ -37,7 +37,6 @@ void PicocCallMain(int argc, char **argv);
 void PicocInitialise(int StackSize);
 void PicocCleanup();
 void PicocPlatformScanFile(const char *FileName);
-void PicocPlatformReadStdin();
 
 extern int PicocExitValue;
 

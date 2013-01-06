@@ -415,7 +415,7 @@ void ParseFor(struct ParseState *Parser)
         if (Condition)
         {
             ParserCopyPos(Parser, &PreStatement);
-            trace_state_printv1(Parser);
+            trace_state_print(Parser);
             ParseStatement(Parser, TRUE);
 
             if (Parser->Mode == RunModeContinue)
@@ -544,7 +544,7 @@ enum ParseResult ParseStatement(struct ParseState *Parser, int CheckTrailingSemi
                 ProgramFail(Parser, "'(' expected");
 
             Condition = ExpressionParseInt(Parser);
-            trace_state_printv1(Parser);
+            trace_state_print(Parser);
 
             if (LexGetToken(Parser, NULL, TRUE) != TokenCloseBracket)
                 ProgramFail(Parser, "')' expected");
@@ -625,7 +625,7 @@ enum ParseResult ParseStatement(struct ParseState *Parser, int CheckTrailingSemi
 
         case TokenFor:
             ParseFor(Parser);
-            //trace_state_printv1(Parser);
+            //trace_state_print(Parser);
             CheckTrailingSemicolon = FALSE;
             break;
 
@@ -804,7 +804,7 @@ enum ParseResult ParseStatement(struct ParseState *Parser, int CheckTrailingSemi
     {
         if (LexGetToken(Parser, NULL, TRUE) != TokenSemicolon)
             ProgramFail(Parser, "';' expected");
-        trace_state_printv1(Parser);
+        trace_state_print(Parser);
     }
 
     return ParseResultOk;
