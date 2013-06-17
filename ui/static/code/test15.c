@@ -1,15 +1,14 @@
 #include<stdio.h>
 
-struct ValZ{
+union Val{
     int i;
     char c;
 };
 
 int main()
 {
-    struct ValZ test;
-    test.i = 10;
-    test.c = 'A';
+    union Val test;
+    test.i = 321;
     printf("%d %c", test.i, test.c);
     return 0;
 }

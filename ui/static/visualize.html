@@ -32,6 +32,11 @@
   <script type="text/javascript" src="/static/js/opt-frontend.js"></script>
   <link rel="stylesheet" href="/static/css/opt-frontend.css"/>
 
+  <link rel="stylesheet" href="/static/css/gh-fork-ribbon.css" />
+  <!--[if IE]>
+    <link rel="stylesheet" href="/static/css/gh-fork-ribbon.ie.css" />
+  <![endif]-->
+
 </head>
 
 <body>
@@ -69,7 +74,35 @@
 
   <div id="pyOutputPane"></div>
 
+  <hr>
+  <footer>
+    <p>
+        <a href="http://dev.pointers.io/static/list.html"> Examples </a>
+
+        &copy; <a href="https://plus.google.com/105696688998749565092">Sai Rahul</a> 
+    </p>
+  </footer>
 </div>
+
+<div class="github-fork-ribbon-wrapper right" style="z-index: 2000;">
+  <div class="github-fork-ribbon">
+    <a href="http://code.google.com/p/pointersio/issues/list" target="_blank">File a Bug</a>
+  </div>
+</div>
+
+<script type="text/javascript">
+
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-256786-5']);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+
+</script>
 
 </body>
 </html>

@@ -2,20 +2,14 @@
 
 int main()
 {
-    int
-    int TEST = 1;
     int i = 0;
-    float a = 1.2;
 
-    printf("Hello World 1\n");
-    printf("Hello World 2\n");
-    printf("%d\n", TEST);
-    printf("%d\n", i);
-    printf("%f\n", a);
-/*
-    for (int i=0;i<10;i++)
+    printf("Hello World \n");
+
+    for (i=0;i<5;i++)
     {
-        printf("%d\n", i + 10);
+        printf("%d\n", i);
     }
-*/
+
+    return 0;
 }

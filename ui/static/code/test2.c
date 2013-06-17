@@ -13,4 +13,5 @@ int main()
         printf("arr[%d]: %d\n", i, arr[i]);
         p += 1;
     }
+    return 0;
 }
