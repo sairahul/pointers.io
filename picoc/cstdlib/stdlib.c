@@ -3,7 +3,7 @@
 
 #ifndef BUILTIN_MINI_STDLIB
 
-static int ZeroValue = 0;
+static int Stdlib_ZeroValue = 0;
 
 #ifndef NO_FP
 void StdlibAtof(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
@@ -76,7 +76,7 @@ void StdlibAbort(struct ParseState *Parser, struct Value *ReturnValue, struct Va
 
 void StdlibExit(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
-    PlatformExit(Param[0]->Val->Integer);
+    PlatformExit(Parser->pc, Param[0]->Val->Integer);
 }
 
 void StdlibGetenv(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
@@ -164,11 +164,11 @@ struct LibraryFunction StdlibFunctions[] =
 };
 
 /* creates various system-dependent definitions */
-void StdlibSetupFunc(void)
+void StdlibSetupFunc(Picoc *pc)
 {
     /* define NULL, TRUE and FALSE */
-    if (!VariableDefined(TableStrRegister("NULL")))
-        VariableDefinePlatformVar(NULL, "NULL", &IntType, (union AnyValue *)&ZeroValue, FALSE);
+    if (!VariableDefined(pc, TableStrRegister(pc, "NULL")))
+        VariableDefinePlatformVar(pc, NULL, "NULL", &pc->IntType, (union AnyValue *)&Stdlib_ZeroValue, FALSE);
 }
 
 #endif /* !BUILTIN_MINI_STDLIB */

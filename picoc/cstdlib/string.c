@@ -3,7 +3,7 @@
 
 #ifndef BUILTIN_MINI_STDLIB
 
-static int ZeroValue = 0;
+static int String_ZeroValue = 0;
 
 void StringStrcpy(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
@@ -35,6 +35,7 @@ void StringStrncat(struct ParseState *Parser, struct Value *ReturnValue, struct 
     ReturnValue->Val->Pointer = strncat(Param[0]->Val->Pointer, Param[1]->Val->Pointer, Param[2]->Val->Integer);
 }
 
+#ifndef WIN32
 void StringIndex(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
     ReturnValue->Val->Pointer = index(Param[0]->Val->Pointer, Param[1]->Val->Integer);
@@ -44,6 +45,7 @@ void StringRindex(struct ParseState *Parser, struct Value *ReturnValue, struct V
 {
     ReturnValue->Val->Pointer = rindex(Param[0]->Val->Pointer, Param[1]->Val->Integer);
 }
+#endif
 
 void StringStrlen(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
@@ -125,6 +127,7 @@ void StringStrxfrm(struct ParseState *Parser, struct Value *ReturnValue, struct 
     ReturnValue->Val->Integer = strxfrm(Param[0]->Val->Pointer, Param[1]->Val->Pointer, Param[2]->Val->Integer);
 }
 
+#ifndef WIN32
 void StringStrdup(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
     ReturnValue->Val->Pointer = strdup(Param[0]->Val->Pointer);
@@ -134,12 +137,15 @@ void StringStrtok_r(struct ParseState *Parser, struct Value *ReturnValue, struct
 {
     ReturnValue->Val->Pointer = strtok_r(Param[0]->Val->Pointer, Param[1]->Val->Pointer, Param[2]->Val->Pointer);
 }
+#endif
 
 /* all string.h functions */
 struct LibraryFunction StringFunctions[] =
 {
-    { StringIndex,         "char *index(char *,int);" },
+#ifndef WIN32
+	{ StringIndex,         "char *index(char *,int);" },
     { StringRindex,        "char *rindex(char *,int);" },
+#endif
     { StringMemcpy,        "void *memcpy(void *,void *,int);" },
     { StringMemmove,       "void *memmove(void *,void *,int);" },
     { StringMemchr,        "void *memchr(char *,int,int);" },
@@ -162,17 +168,19 @@ struct LibraryFunction StringFunctions[] =
     { StringStrstr,        "char *strstr(char *,char *);" },
     { StringStrtok,        "char *strtok(char *,char *);" },
     { StringStrxfrm,       "int strxfrm(char *,char *,int);" },
-    { StringStrdup,        "char *strdup(char *);" },
+#ifndef WIN32
+	{ StringStrdup,        "char *strdup(char *);" },
     { StringStrtok_r,      "char *strtok_r(char *,char *,char **);" },
+#endif
     { NULL,             NULL }
 };
 
 /* creates various system-dependent definitions */
-void StringSetupFunc(void)
+void StringSetupFunc(Picoc *pc)
 {
     /* define NULL */
-    if (!VariableDefined(TableStrRegister("NULL")))
-        VariableDefinePlatformVar(NULL, "NULL", &IntType, (union AnyValue *)&ZeroValue, FALSE);
+    if (!VariableDefined(pc, TableStrRegister(pc, "NULL")))
+        VariableDefinePlatformVar(pc, NULL, "NULL", &pc->IntType, (union AnyValue *)&String_ZeroValue, FALSE);
 }
 
 #endif /* !BUILTIN_MINI_STDLIB */

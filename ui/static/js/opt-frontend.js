@@ -241,7 +241,7 @@ $(document).ready(function() {
 
   var fragment = $.deparam.fragment();
   if (fragment.filename){
-    $.get("code/"+fragment.filename, setCodeMirrorVal);
+    $.get("static/code/"+fragment.filename, setCodeMirrorVal);
     return false;
   }
 

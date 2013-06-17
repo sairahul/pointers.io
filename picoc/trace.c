@@ -267,7 +267,7 @@ char *read_stdout(const char *file_name)
     return source;
 }
 
-json_t* get_stack_frames(json_t *address_dict)
+json_t* get_stack_frames(json_t *address_dict, struct ParseState *parser)
 {
     int j;
     const struct StackFrame *sf;
@@ -279,7 +279,7 @@ json_t* get_stack_frames(json_t *address_dict)
 
     stack_frames = json_array();
 
-    for (sf = TopStackFrame;
+    for (sf = parser->pc->TopStackFrame;
          sf != NULL;
          sf = sf->PreviousStackFrame) {
 
@@ -307,8 +307,8 @@ json_t* get_stack_frames(json_t *address_dict)
 
     }
 
-    for(j=0; j<GlobalTable.Size; j++){
-        for(te = GlobalTable.HashTable[j];
+    for(j=0; j<parser->pc->GlobalTable.Size; j++){
+        for(te = parser->pc->GlobalTable.HashTable[j];
             te != NULL;
             te = te->Next){
 
@@ -560,7 +560,7 @@ void trace_state_print(struct ParseState *parser)
     json_t *stack_frames, *stack_frame, *ordered_varnames, *encoded_locals, *heap;
     int i, stack_size, j;
 
-    if (!TopStackFrame || !trace_get_trace_file())
+    if (!parser->pc->TopStackFrame || !trace_get_trace_file())
         return;
 
     object = json_object();
@@ -575,7 +575,7 @@ void trace_state_print(struct ParseState *parser)
     json_object_set_new(object, "ordered_globals", ordered_globals);
     json_object_set_new(object, "globals", globals);
     json_object_set_new(object, "stdout", json_string(std_output));
-    json_object_set_new(object, "func_name", json_string(TopStackFrame->FuncName));
+    json_object_set_new(object, "func_name", json_string(parser->pc->TopStackFrame->FuncName));
     json_object_set_new(object, "heap", heap);
 
     /*
@@ -587,8 +587,8 @@ void trace_state_print(struct ParseState *parser)
     /*
      * Store all globals.
      */
-    for(j=0; j<GlobalTable.Size; j++){
-        for(te = GlobalTable.HashTable[j];
+    for(j=0; j<parser->pc->GlobalTable.Size; j++){
+        for(te = parser->pc->GlobalTable.HashTable[j];
             te != NULL;
             te = te->Next){
 
@@ -602,10 +602,10 @@ void trace_state_print(struct ParseState *parser)
         }
     }
 
-    stack_frames = get_stack_frames(address_dict);
+    stack_frames = get_stack_frames(address_dict, parser);
     i = stack_size = json_array_size(stack_frames);
 
-    for (sf = TopStackFrame;
+    for (sf = parser->pc->TopStackFrame;
          sf != NULL;
          sf = sf->PreviousStackFrame) {
 
