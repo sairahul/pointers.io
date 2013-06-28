@@ -1928,7 +1928,7 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
       literalStr = literalStr.replace(new RegExp('\"', 'g'), '\\"'); // replace ALL
       literalStr = '"' + literalStr + '"';
 
-      d3DomElement.append('<span class="stringObj">' + literalStr + '</span>');
+      d3DomElement.append('<span class="stringObj" addr="' + addr + '">' + literalStr + '</span>');
     }
     else {
       assert(false);
@@ -1974,6 +1974,9 @@ ExecutionVisualizer.prototype.renderDataStructures = function() {
     renderedObjectIDs.set(objID, 1);
 
     var obj = curEntry.heap[objID];
+    // ME:TODO:HACK
+    if(!$.isArray(obj))
+        return;
     assert($.isArray(obj));
 
     // ME:
