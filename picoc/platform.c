@@ -27,6 +27,9 @@ void PicocInitialise(Picoc *pc, int StackSize)
 #endif
     PlatformLibraryInit(pc);
     DebugInit(pc);
+
+    /* Malloc related */
+    pc->TotalMallocs = 0;
 }
 
 /* free memory */

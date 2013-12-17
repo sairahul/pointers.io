@@ -466,6 +466,10 @@ struct Picoc_Struct
     struct Table StringTable;
     struct TableEntry *StringHashTable[STRING_TABLE_SIZE];
     char *StrEmpty;
+
+    /* Malloc allocation table */
+    int TotalMallocs;
+    unsigned long MallocInfo[MAX_MALLOCS][2];
 };
 
 /* table.c */

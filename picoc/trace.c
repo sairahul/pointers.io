@@ -136,6 +136,14 @@ long get_integer_value(enum BaseType type, union AnyValue *any_value){
     return value;
 }
 
+int find_malloc_table(Picoc *pc, unsigned long address){
+    for(int i=0; i<pc->TotalMallocs; i++){
+        if(pc->MallocInfo[i][0] == address)
+            return i;
+    }
+    return -1;
+}
+
 static void trace_variable_fill (TraceVariable *var,
                                  const struct TableEntry *entry,
                                  const char *base_addr)
@@ -150,6 +158,7 @@ static void trace_variable_fill (TraceVariable *var,
     var->is_array = entry->p.v.Val->Typ->Base == TypeArray;
     entry_type = entry->p.v.Val->Typ;
 
+    /* TODO: Commented this part */
     if (entry_type->Base == TypePointer && entry_type->FromType != NULL &&
             entry_type->FromType->Base == TypeChar){
         var->is_array = 1;

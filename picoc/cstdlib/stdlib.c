@@ -39,24 +39,68 @@ void StdlibStrtoul(struct ParseState *Parser, struct Value *ReturnValue, struct 
     ReturnValue->Val->Integer = strtoul(Param[0]->Val->Pointer, Param[1]->Val->Pointer, Param[2]->Val->Integer);
 }
 
+void PrintMallocTable(Picoc *pc)
+{
+    printf("MallocTable\n------------\n");
+    for(int i=0; i<pc->TotalMallocs; i++){
+        printf("%lu - %lu\n", pc->MallocInfo[i][0], pc->MallocInfo[i][1]);
+    }
+    printf("+++++++++++++++++++\n");
+}
+
+void AddPointerMallocTable(Picoc *pc, unsigned long address, unsigned long size)
+{
+    pc->MallocInfo[pc->TotalMallocs][0] = address;
+    pc->MallocInfo[pc->TotalMallocs][1] = size;
+    pc->TotalMallocs++;
+    PrintMallocTable(pc);
+}
+
+void RemovePointerMallocTable(Picoc *pc, unsigned long address)
+{
+    int i = 0;
+    for(i=0; i<pc->TotalMallocs; i++){
+        if(pc->MallocInfo[i][0] == address)
+            break;
+    }
+
+    if(i == pc->TotalMallocs)
+        return;
+
+    while (i<pc->TotalMallocs - 1){
+        pc->MallocInfo[i][0] = pc->MallocInfo[i+1][0];
+        pc->MallocInfo[i][1] = pc->MallocInfo[i+1][1];
+    }
+    pc->TotalMallocs--;
+    PrintMallocTable(pc);
+}
+
 void StdlibMalloc(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
+    /*printf("********** Malloc called with %d\n", Param[0]->Val->Integer);*/
     ReturnValue->Val->Pointer = malloc(Param[0]->Val->Integer);
+    AddPointerMallocTable(Parser->pc, (unsigned long)((void *)ReturnValue->Val->Pointer), Param[0]->Val->Integer);
 }
 
 void StdlibCalloc(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
     ReturnValue->Val->Pointer = calloc(Param[0]->Val->Integer, Param[1]->Val->Integer);
+    AddPointerMallocTable(Parser->pc, (unsigned long)((void *)ReturnValue->Val->Pointer), Param[0]->Val->Integer*Param[1]->Val->Integer);
 }
 
 void StdlibRealloc(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
     ReturnValue->Val->Pointer = realloc(Param[0]->Val->Pointer, Param[1]->Val->Integer);
+    /* TODO: Add to the malloc table */
 }
+
 
 void StdlibFree(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
 {
+    /*printf("########## Free called\n");*/
     free(Param[0]->Val->Pointer);
+    RemovePointerMallocTable(Parser->pc, (unsigned long)((void *)(Param[0]->Val->Pointer)));
+    PrintMallocTable(Parser->pc);
 }
 
 void StdlibRand(struct ParseState *Parser, struct Value *ReturnValue, struct Value **Param, int NumArgs)
