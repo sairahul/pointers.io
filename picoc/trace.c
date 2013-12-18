@@ -146,7 +146,8 @@ int find_malloc_table(Picoc *pc, unsigned long address){
 
 static void trace_variable_fill (TraceVariable *var,
                                  const struct TableEntry *entry,
-                                 const char *base_addr)
+                                 const char *base_addr,
+                                 Picoc *pc)
 {
     long array_type_size;
     struct ValueType *from_type, *type, *entry_type;
@@ -306,7 +307,7 @@ json_t* get_stack_frames(json_t *address_dict, struct ParseState *parser)
 
                 if (! te->p.v.Val->IsLValue)
                     continue;
-                trace_variable_fill(&var, te, NULL);
+                trace_variable_fill(&var, te, NULL, parser->pc);
 
                 sprintf(buf1, "%lu", (unsigned long)var.address);
                 sprintf(buf2, "%s.%s", sf->FuncName, var.var_name);
@@ -323,7 +324,7 @@ json_t* get_stack_frames(json_t *address_dict, struct ParseState *parser)
 
             if (! te->p.v.Val->IsLValue)
                 continue;
-            trace_variable_fill(&var, te, NULL);
+            trace_variable_fill(&var, te, NULL, parser->pc);
 
             sprintf(buf1, "%lu", (unsigned long)var.address);
             json_object_set_new(address_dict, buf1, json_string(var.var_name));
@@ -431,7 +432,7 @@ void set_null_object(json_t *heap, json_t *globals, json_t *ordered_globals)
 
 json_t *store_variable(json_t *ordered_varnames, json_t *encoded_locals,
                     json_t *heap, TraceVariable *var, int compound_obj,
-                    ObjectType obj_type)
+                    ObjectType obj_type, Picoc *pc)
 {
     json_t *val, *heapobj = NULL, *tmpval, *empty, *tmpval1;
     char buf[25];
@@ -497,7 +498,7 @@ json_t *store_variable(json_t *ordered_varnames, json_t *encoded_locals,
             var_tmp.type = var->type;
 
             for (i = 0; i< var->array_len; i++){
-                tmpval = store_variable(NULL, NULL, heap, &var_tmp, 1, NORMAL_OBJECT);
+                tmpval = store_variable(NULL, NULL, heap, &var_tmp, 1, NORMAL_OBJECT, pc);
                 json_array_append_new(heapobj, tmpval);
 
                 var_tmp.base_address = var->base_address + ((i+1)*var->size);
@@ -533,8 +534,8 @@ json_t *store_variable(json_t *ordered_varnames, json_t *encoded_locals,
             if (te==NULL)
                 continue;
 
-            trace_variable_fill(&var_tmp, te, var->base_address);
-            tmpval = store_variable(NULL, NULL, heap, &var_tmp, 1, obj_type);
+            trace_variable_fill(&var_tmp, te, var->base_address, pc);
+            tmpval = store_variable(NULL, NULL, heap, &var_tmp, 1, obj_type, pc);
             if (var_tmp.is_array || var_tmp.type == TypeArray || var_tmp.type == TypeStruct || var_tmp.type == TypeUnion){
                 tmpval1 = json_array();
                 json_array_append_new(tmpval1, json_string(var_tmp.var_name));
@@ -603,11 +604,11 @@ void trace_state_print(struct ParseState *parser)
 
             if (! te->p.v.Val->IsLValue)
                 continue;
-            trace_variable_fill(&var, te, NULL);
+            trace_variable_fill(&var, te, NULL, parser->pc);
 
             if(strncmp(var.var_name, "__exit_value", 12)==0)
                 continue;
-            store_variable(ordered_globals, globals, heap, &var, 0, NORMAL_OBJECT);
+            store_variable(ordered_globals, globals, heap, &var, 0, NORMAL_OBJECT, parser->pc);
         }
     }
 
@@ -641,8 +642,8 @@ void trace_state_print(struct ParseState *parser)
                 if (! te->p.v.Val->IsLValue)
                     continue;
 
-                trace_variable_fill(&var, te, NULL);
-                store_variable(ordered_varnames, encoded_locals, heap, &var, 0, NORMAL_OBJECT);
+                trace_variable_fill(&var, te, NULL, parser->pc);
+                store_variable(ordered_varnames, encoded_locals, heap, &var, 0, NORMAL_OBJECT, parser->pc);
             }
         }
 
