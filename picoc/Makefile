@@ -1,21 +1,26 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -g -DUNIX_HOST
-LIBS=-lm -lreadline -Llibs/lib -ljansson
+#CFLAGS=-Wall -pedantic -g -DUNIX_HOST -DVER=\"`svnversion -n`\"
+CFLAGS=-Wall -pedantic -g -D UNIX_HOST
+LIBS=-lm -lreadline -L libs/lib -ljansson
 INCLUDE=-I libs/include
 
 TARGET	= picoc
 SRCS	= picoc.c table.c lex.c parse.c expression.c heap.c type.c \
-	variable.c clibrary.c platform.c include.c \
+	variable.c clibrary.c platform.c include.c debug.c \
 	platform/platform_unix.c platform/library_unix.c \
 	cstdlib/stdio.c cstdlib/math.c cstdlib/string.c cstdlib/stdlib.c \
 	cstdlib/time.c cstdlib/errno.c cstdlib/ctype.c cstdlib/stdbool.c \
 	cstdlib/unistd.c trace.c
+
 OBJS	:= $(SRCS:%.c=%.o)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LIBS) $(INCLUDE)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LIBS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
 test:	all
 	(cd tests; make test)
@@ -25,7 +30,7 @@ clean:
 
 count:
 	@echo "Core:"
-	@cat picoc.h interpreter.h picoc.c table.c lex.c parse.c expression.c platform.c heap.c type.c variable.c include.c | grep -v '^[ 	]*/\*' | grep -v '^[ 	]*$$' | wc
+	@cat picoc.h interpreter.h picoc.c table.c lex.c parse.c expression.c platform.c heap.c type.c variable.c include.c debug.c | grep -v '^[ 	]*/\*' | grep -v '^[ 	]*$$' | wc
 	@echo ""
 	@echo "Everything:"
 	@cat $(SRCS) *.h */*.h | wc
@@ -43,6 +48,7 @@ variable.o: variable.c interpreter.h platform.h
 clibrary.o: clibrary.c picoc.h interpreter.h platform.h
 platform.o: platform.c picoc.h interpreter.h platform.h
 include.o: include.c picoc.h interpreter.h platform.h
+debug.o: debug.c interpreter.h platform.h
 platform/platform_unix.o: platform/platform_unix.c picoc.h interpreter.h platform.h
 platform/library_unix.o: platform/library_unix.c interpreter.h platform.h
 cstdlib/stdio.o: cstdlib/stdio.c interpreter.h platform.h
@@ -54,5 +60,4 @@ cstdlib/errno.o: cstdlib/errno.c interpreter.h platform.h
 cstdlib/ctype.o: cstdlib/ctype.c interpreter.h platform.h
 cstdlib/stdbool.o: cstdlib/stdbool.c interpreter.h platform.h
 cstdlib/unistd.o: cstdlib/unistd.c interpreter.h platform.h
-trace.o: trace.c trace.h interpreter.h platform.h libs/include/jansson.h
-
+trace.o: trace.c trace.h interpreter.h libs/include/jansson.h

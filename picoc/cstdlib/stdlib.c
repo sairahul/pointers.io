@@ -41,6 +41,7 @@ void StdlibStrtoul(struct ParseState *Parser, struct Value *ReturnValue, struct 
 
 void PrintMallocTable(Picoc *pc)
 {
+    return;
     printf("MallocTable\n------------\n");
     for(int i=0; i<pc->TotalMallocs; i++){
         printf("%lu - %lu\n", pc->MallocInfo[i][0], pc->MallocInfo[i][1]);

@@ -213,7 +213,7 @@ static void trace_variable_fill (TraceVariable *var,
                 var->size = type->Sizeof;
                 break;
             default:
-                if(is_identifier){
+                if(is_identifier && any_value->Identifier != NULL){
                     var->v.array_mem = any_value->Identifier;
                     var->array_len = strlen(any_value->Identifier) + 1;
                 }else{
