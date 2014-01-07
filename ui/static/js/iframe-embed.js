@@ -93,7 +93,7 @@ $(document).ready(function() {
               alert(trace[trace.length - 1].exception_msg);
             }
             else {
-              alert("Whoa, unknown error! Reload to try again, or report a bug to philip@pgbovine.net\n\n(Click the 'Generate URL' button to include a unique URL in your email bug report.)");
+              alert("Whoa, unknown error! Reload to try again, or report a bug at https://github.com/sairahul/pointers.io/issues/new");
             }
           }
           else {
